@@ -1,0 +1,8 @@
+{
+  "name": "Stitch Cognitive Intelligence",
+  "description": "A high-performance acquisition intelligence platform with AI-driven diagnostics, lead intelligence, decision engine, and virtual SDR management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

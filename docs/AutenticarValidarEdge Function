@@ -1,0 +1,417 @@
+Fechado. Aqui vai **o pacote completo** do que você pediu, já no padrão “produção MVP”:
+
+1. **Autenticar / validar origem** (Edge Function)
+2. **Mapear IDs** (tenant / project / account)
+3. **Chamar `rpc_ingest_lead_event`**
+4. **Chamar `rpc_recompute_lead_score` somente em eventos fortes**
+5. **Pré-popular `event_types`** com pesos (v0) por tipo de funil: **Outbound / Inbound / Conversational**
+
+---
+
+# 1) Autenticar / Validar origem (Edge Function)
+
+## 1.1 Padrão recomendado (simples e forte)
+
+Use um **shared secret por Project Account**, e valide via header:
+
+* Header obrigatório: `x-aip-signature`
+* Formato: `hex(hmac_sha256(secret, raw_body))`
+
+✅ Funciona para:
+
+* Landing pages / forms próprios
+* n8n
+* chatbots
+* qualquer webhook
+
+> Para Meta/Google/WhatsApp oficiais você pode adicionar validações específicas depois, mas esse padrão é o “núcleo”.
+
+---
+
+# 2) Mapear IDs (tenant/project/account)
+
+Você tem duas opções de design (eu recomendo a A):
+
+## A) Mapear por `ingest_key` do project_account (recomendado)
+
+Adicione no `project_accounts.config` algo assim:
+
+```json
+{
+  "ingest_key": "pk_live_xxx",
+  "ingest_secret": "sk_live_xxx",
+  "scoring_strong_events": ["reply", "call_booked", "form_submit"]
+}
+```
+
+E o webhook manda:
+
+* `x-ingest-key: pk_live_xxx`
+
+A Edge Function busca no DB:
+
+* `tenant_id`, `project_id`, `project_account_id`
+
+✅ Fica multi-tenant automático e sem ambiguidade.
+
+---
+
+# 3) Edge Function (Supabase) — `ingest`
+
+Abaixo um **exemplo completo** (Deno/TS) com:
+
+* leitura do `rawBody`
+* validação HMAC
+* lookup do `project_account`
+* chamada do RPC `rpc_ingest_lead_event`
+* chamada opcional do `rpc_recompute_lead_score` quando evento forte
+* resposta padronizada
+
+> **Importante**: isso é o **código da Edge Function** (você cria em `supabase/functions/ingest/index.ts`).
+
+```ts
+// supabase/functions/ingest/index.ts
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+function hexFromArrayBuffer(buffer: ArrayBuffer) {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function hmacSha256Hex(secret: string, message: string) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return hexFromArrayBuffer(sig);
+}
+
+Deno.serve(async (req) => {
+  try {
+    // 1) raw body for signature validation
+    const rawBody = await req.text();
+    const body = rawBody ? JSON.parse(rawBody) : {};
+
+    // headers
+    const ingestKey = req.headers.get("x-ingest-key") ?? "";
+    const signature = req.headers.get("x-aip-signature") ?? "";
+
+    if (!ingestKey || !signature) {
+      return new Response(JSON.stringify({ error: "Missing x-ingest-key or x-aip-signature" }), { status: 401 });
+    }
+
+    // 2) Supabase service client (service role bypasses RLS)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // 3) lookup project account by ingest_key
+    const { data: acc, error: accErr } = await supabase
+      .from("project_accounts")
+      .select("id, tenant_id, project_id, config")
+      .eq("config->>ingest_key", ingestKey)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (accErr || !acc) {
+      return new Response(JSON.stringify({ error: "Invalid ingest key" }), { status: 401 });
+    }
+
+    const ingestSecret = acc.config?.ingest_secret;
+    if (!ingestSecret) {
+      return new Response(JSON.stringify({ error: "Ingest secret not configured for this account" }), { status: 401 });
+    }
+
+    // 4) validate signature
+    const expected = await hmacSha256Hex(ingestSecret, rawBody);
+    if (expected !== signature) {
+      return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 401 });
+    }
+
+    // 5) Map payload -> rpc params
+    const event_code = body.event_code ?? body.event ?? "unknown";
+    const happened_at = body.happened_at ?? null;
+
+    const lead = body.lead ?? {};
+    const context = body.context ?? {};
+    const source = body.source ?? {};
+    const payload = body.payload ?? body; // keep full body if you want
+
+    const rpcParams = {
+      p_tenant_id: acc.tenant_id,
+      p_project_id: acc.project_id,
+      p_project_account_id: acc.id,
+      p_event_code: event_code,
+      p_happened_at: happened_at,
+
+      p_external_id: lead.external_id ?? lead.id ?? null,
+      p_email: lead.email ?? null,
+      p_phone: lead.phone ?? null,
+      p_full_name: lead.full_name ?? lead.name ?? null,
+
+      p_product_id: context.product_id ?? null,
+      p_strategy_id: context.strategy_id ?? null,
+      p_approach_id: context.approach_id ?? null,
+      p_flow_id: context.flow_id ?? null,
+
+      p_source: source,
+      p_payload: payload,
+    };
+
+    // 6) Ingest
+    const { data: leadId, error: ingestErr } = await supabase.rpc("rpc_ingest_lead_event", rpcParams);
+    if (ingestErr || !leadId) {
+      return new Response(JSON.stringify({ error: "Failed to ingest", details: ingestErr }), { status: 500 });
+    }
+
+    // 7) Optional scoring on strong events
+    const strongEvents = new Set(["reply", "call_booked", "form_submit", "quiz_submit", "won", "lost"]);
+    if (strongEvents.has(event_code)) {
+      await supabase.rpc("rpc_recompute_lead_score", { p_lead_id: leadId });
+    }
+
+    return new Response(JSON.stringify({ ok: true, lead_id: leadId }), { status: 200 });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: "Unhandled", details: String(e) }), { status: 500 });
+  }
+});
+```
+
+### Payload padrão que sua stack deve enviar
+
+```json
+{
+  "event_code": "form_submit",
+  "happened_at": "2026-01-14T15:12:00Z",
+  "lead": {
+    "external_id": "meta_123",
+    "full_name": "Ana Silva",
+    "email": "ana@email.com",
+    "phone": "+5511999999999"
+  },
+  "context": {
+    "product_id": null,
+    "strategy_id": null,
+    "approach_id": null,
+    "flow_id": null
+  },
+  "source": {
+    "channel": "meta_ads",
+    "campaign": "CAMP_01",
+    "creative": "CR_02",
+    "utm_source": "instagram"
+  },
+  "payload": {
+    "any_extra": "fields"
+  }
+}
+```
+
+---
+
+# 4) Eventos iniciais padronizados + pesos (v0) por tipo de funil
+
+Vamos padronizar estes eventos “núcleo”:
+
+* `page_view`
+* `cta_click`
+* `form_start`
+* `form_submit`
+* `quiz_submit`
+* `reply`
+* `call_booked`
+* `won`
+* `lost`
+* `unsubscribe` (importante para governança)
+
+Agora o que importa: **pesos diferentes por tipo de funil**.
+
+### 4.1 Matriz de pesos (v0)
+
+#### Outbound (prospecção / cold / DM / WhatsApp)
+
+* `page_view`: +1
+* `cta_click`: +2
+* `form_start`: +3
+* `form_submit`: +10
+* `quiz_submit`: +12
+* `reply`: +18  ✅ forte
+* `call_booked`: +30 ✅ forte
+* `won`: +100
+* `lost`: -50
+* `unsubscribe`: -20
+
+#### Inbound (SEO / conteúdo / intenção construída)
+
+* `page_view`: +1
+* `cta_click`: +4
+* `form_start`: +5
+* `form_submit`: +14 ✅ forte
+* `quiz_submit`: +18 ✅ forte
+* `reply`: +12
+* `call_booked`: +25 ✅ forte
+* `won`: +100
+* `lost`: -50
+* `unsubscribe`: -25
+
+#### Conversational (chatbot / SDR virtual / diagnóstico)
+
+* `page_view`: +1
+* `cta_click`: +3
+* `form_start`: +4
+* `form_submit`: +10
+* `quiz_submit`: +15
+* `reply`: +20 ✅ forte
+* `call_booked`: +28 ✅ forte
+* `won`: +100
+* `lost`: -50
+* `unsubscribe`: -15
+
+---
+
+# 5) SQL para pré-popular `event_types`
+
+Como `event_types` depende de `flow_id`, precisamos de uma convenção:
+
+✅ Criar flows “template” por projeto:
+
+* `Outbound Template Flow`
+* `Inbound Template Flow`
+* `Conversational Template Flow`
+
+Depois inserimos os `event_types` para esses flows.
+
+Abaixo vai um script que:
+
+1. cria 3 flows template (se não existirem)
+2. popula `event_types` com pesos conforme funil
+
+> **Você escolhe o projeto e approach** que será dono desses flows templates. Se ainda não existir approach, eu também posso te mandar um “seed” completo (project → strategy → approach → flows).
+
+### SQL (seed) — assumindo que você já tem:
+
+* `tenant_id`
+* `approach_id_outbound`, `approach_id_inbound`, `approach_id_conversational`
+
+```sql
+-- =========================
+-- EVENT TYPES SEED (per flow)
+-- Replace :tenant_id and :approach_ids
+-- =========================
+
+do $$
+declare
+  v_tenant uuid := :'tenant_id'::uuid;
+
+  v_flow_out uuid;
+  v_flow_in uuid;
+  v_flow_conv uuid;
+begin
+  -- Create template flows if missing
+  insert into public.flows (tenant_id, approach_id, name, status, version)
+  values (v_tenant, :'approach_id_outbound'::uuid, 'Outbound Template Flow', 'active', 1)
+  on conflict do nothing;
+
+  insert into public.flows (tenant_id, approach_id, name, status, version)
+  values (v_tenant, :'approach_id_inbound'::uuid, 'Inbound Template Flow', 'active', 1)
+  on conflict do nothing;
+
+  insert into public.flows (tenant_id, approach_id, name, status, version)
+  values (v_tenant, :'approach_id_conversational'::uuid, 'Conversational Template Flow', 'active', 1)
+  on conflict do nothing;
+
+  select id into v_flow_out from public.flows
+    where tenant_id = v_tenant and name='Outbound Template Flow' limit 1;
+
+  select id into v_flow_in from public.flows
+    where tenant_id = v_tenant and name='Inbound Template Flow' limit 1;
+
+  select id into v_flow_conv from public.flows
+    where tenant_id = v_tenant and name='Conversational Template Flow' limit 1;
+
+  -- Helper to insert event types
+  -- OUTBOUND
+  insert into public.event_types (tenant_id, flow_id, code, description, weight, schema)
+  values
+    (v_tenant, v_flow_out, 'page_view', 'Page viewed', 1, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'cta_click', 'CTA clicked', 2, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'form_start', 'Form started', 3, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'form_submit', 'Form submitted', 10, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'quiz_submit', 'Quiz submitted', 12, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'reply', 'Lead replied', 18, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'call_booked', 'Call booked', 30, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'won', 'Deal won', 100, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'lost', 'Deal lost', -50, '{}'::jsonb),
+    (v_tenant, v_flow_out, 'unsubscribe', 'Unsubscribed', -20, '{}'::jsonb)
+  on conflict (tenant_id, flow_id, code) do update
+    set weight = excluded.weight,
+        description = excluded.description;
+
+  -- INBOUND
+  insert into public.event_types (tenant_id, flow_id, code, description, weight, schema)
+  values
+    (v_tenant, v_flow_in, 'page_view', 'Page viewed', 1, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'cta_click', 'CTA clicked', 4, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'form_start', 'Form started', 5, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'form_submit', 'Form submitted', 14, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'quiz_submit', 'Quiz submitted', 18, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'reply', 'Lead replied', 12, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'call_booked', 'Call booked', 25, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'won', 'Deal won', 100, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'lost', 'Deal lost', -50, '{}'::jsonb),
+    (v_tenant, v_flow_in, 'unsubscribe', 'Unsubscribed', -25, '{}'::jsonb)
+  on conflict (tenant_id, flow_id, code) do update
+    set weight = excluded.weight,
+        description = excluded.description;
+
+  -- CONVERSATIONAL
+  insert into public.event_types (tenant_id, flow_id, code, description, weight, schema)
+  values
+    (v_tenant, v_flow_conv, 'page_view', 'Page viewed', 1, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'cta_click', 'CTA clicked', 3, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'form_start', 'Form started', 4, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'form_submit', 'Form submitted', 10, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'quiz_submit', 'Quiz submitted', 15, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'reply', 'Lead replied', 20, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'call_booked', 'Call booked', 28, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'won', 'Deal won', 100, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'lost', 'Deal lost', -50, '{}'::jsonb),
+    (v_tenant, v_flow_conv, 'unsubscribe', 'Unsubscribed', -15, '{}'::jsonb)
+  on conflict (tenant_id, flow_id, code) do update
+    set weight = excluded.weight,
+        description = excluded.description;
+
+end $$;
+```
+
+---
+
+## O jeito mais rápido de você usar isso AGORA (sem perguntas)
+
+Como você disse que o DB está limpo, o caminho de ouro é:
+
+1. Rodar migration base (tabelas)
+2. Criar 1 tenant + 1 project + 3 strategies + 3 approaches (Outbound/Inbound/Conversational)
+3. Rodar o seed `event_types` acima
+4. Criar 1 `project_account` com `ingest_key` e `ingest_secret`
+5. Subir Edge Function `/ingest`
+
+Se você quiser, eu já te devolvo **um seed SQL completo** que cria automaticamente:
+
+* tenant
+* membership (owner)
+* project
+* 3 strategies
+* 3 approaches
+* 3 flows template
+* event_types
+* 1 project_account com ingest_key/secret
+
+Tudo em um único script “bootstrap”.

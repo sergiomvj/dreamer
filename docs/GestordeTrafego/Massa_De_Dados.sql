@@ -9,7 +9,7 @@ DECLARE
     v_proj3_id UUID;
 BEGIN
     -- 1. Buscar o primeiro tenant disponível (Workspace)
-    SELECT id INTO v_tenant_id FROM workspaces LIMIT 1;
+    SELECT id INTO v_tenant_id FROM tenants LIMIT 1;
 
     IF v_tenant_id IS NULL THEN
         RAISE NOTICE 'Nenhum tenant (workspace) encontrado. Crie um workspace na UI antes de rodar este script.';

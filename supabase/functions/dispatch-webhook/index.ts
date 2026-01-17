@@ -43,6 +43,8 @@ Deno.serve(async (req) => {
 
         const results: any[] = [];
 
+        const appName = Deno.env.get("APP_NAME") || "Dreamer";
+
         for (const ev of events ?? []) {
             if (!shouldRetry(ev, maxRetries)) {
                 results.push({ id: ev.id, skipped: true, reason: "max_retries_reached" });
@@ -61,6 +63,7 @@ Deno.serve(async (req) => {
 
             const envelope = {
                 event_id: ev.id,
+                app_name: appName,
                 event_type: ev.event_type,
                 tenant_id: ev.tenant_id,
                 project_id: ev.project_id,

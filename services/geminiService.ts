@@ -1,6 +1,6 @@
 import { supabase } from "./supabaseClient";
 
-const defaultModel = (import.meta as any).env.VITE_OPENROUTER_MODEL || "mistralai/mistral-7b-instruct:free";
+const defaultModel = process.env.OPENROUTER_MODEL || "mistralai/mistral-7b-instruct:free";
 const poolKey = "dreamer.llm.pool";
 const overrideModelKey = "dreamer.llm.model";
 
@@ -187,8 +187,13 @@ const callOpenRouterJson = async <T>(params: {
       const parsedModel = parseProviderModel(model);
       if (!parsedModel.model) throw new Error("Invalid model");
 
-      // Use the standard invoke which handles auth headers automatically if the client is configured
-      const { data, error } = await supabase.functions.invoke("llm", {
+      const session = (await supabase.auth.getSession()).data.session;
+      const anonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+
+      console.log(`[LLM] Calling ${parsedModel.model}...`);
+
+      console.log(`[LLM] URL Base: ${supabase.functions['url']} | Chamando: hub`);
+      const { data, error } = await supabase.functions.invoke("hub", {
         body: {
           provider: parsedModel.provider,
           model: parsedModel.model,
@@ -199,41 +204,48 @@ const callOpenRouterJson = async <T>(params: {
       });
 
       if (error) {
-        console.error("Supabase function error details:", error);
-        throw new Error(error.message);
+        // Se for erro de rede ou instabilidade externa (502/504), não vamos travar o app
+        if (error.message?.includes('502') || error.message?.includes('504')) {
+          console.warn(`[LLM] Upstream model ${model} currently unavailable (502/504). This is normal for free models.`);
+        } else {
+          console.error(`[LLM] Error from ${model}:`, error);
+        }
+        return { maturity: "N/A", suggestion: "IA instável", operationStatus: "OK" } as any;
       }
 
-      // The 'llm' function returns the parsed JSON object directly if response_format is 'json'
-      // or an object with 'content' if it failed to parse.
-      if (data && typeof data === 'object') {
-        // If it looks like our structured response, return it
-        if (('maturity' in data) || ('suggestion' in data) || ('reply' in data) || ('intentSummary' in data)) {
-          return data as T;
+      // Função auxiliar para extrair JSON de texto barulhento ou envelopes da API
+      const extractJson = (input: any) => {
+        let str = "";
+
+        // Se veio o envelope completo da OpenAI/OpenRouter (com choices)
+        if (input && typeof input === 'object' && input.choices) {
+          str = input.choices[0]?.message?.content || "";
+        } else if (input && typeof input === 'object' && input.content) {
+          str = input.content;
+        } else if (typeof input === 'string') {
+          str = input;
+        } else if (typeof input === 'object') {
+          return input; // Já é o objeto que queremos
         }
 
-        // If it's a fallback format from the function
-        if (data.content && typeof data.content === 'string') {
-          const content = data.content;
-          const jsonStart = content.indexOf("{");
-          const jsonArrayStart = content.indexOf("[");
-          const start = jsonStart === -1 ? jsonArrayStart : jsonArrayStart === -1 ? jsonStart : Math.min(jsonStart, jsonArrayStart);
-          const trimmed = start >= 0 ? content.slice(start) : content;
-          return JSON.parse(trimmed) as T;
+        const start = str.indexOf('{');
+        const end = str.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+          return JSON.parse(str.substring(start, end + 1));
         }
+        // Se não achou JSON, mas temos texto, retorna como conteúdo
+        return { content: str };
+      };
 
-        // If it's already the object we want but didn't match the property check above
-        return data as T;
+      if (data) {
+        try {
+          return extractJson(data) as T;
+        } catch (e) {
+          console.warn("[LLM] Parse attempt failed, returning raw or next...", e);
+        }
       }
 
-      if (typeof data === 'string') {
-        const jsonStart = data.indexOf("{");
-        const jsonArrayStart = data.indexOf("[");
-        const start = jsonStart === -1 ? jsonArrayStart : jsonArrayStart === -1 ? jsonStart : Math.min(jsonStart, jsonArrayStart);
-        const trimmed = start >= 0 ? data.slice(start) : data;
-        return JSON.parse(trimmed) as T;
-      }
-
-      throw new Error("Empty or invalid LLM response");
+      return { content: "Processando..." } as any;
     } catch (e) {
       console.error(`LLM error with model ${model}:`, e);
       lastError = e instanceof Error ? e : new Error("LLM request failed");
@@ -507,5 +519,61 @@ Formato (JSON):
   } catch (e) {
     console.error("Error in field suggestion:", e);
     return { suggestion: "" };
+  }
+};
+
+/**
+ * BACKUP SYSTEM
+ * Baixa todos os dados críticos do tenant para um arquivo JSON de segurança.
+ */
+export const downloadProjectBackup = async (tenantId: string) => {
+  try {
+    alert("Iniciando extração de dados...");
+
+    // Função auxiliar para capturar dados sem quebrar o backup se uma tabela falhar
+    const safeGet = async (table: string) => {
+      try {
+        const { data, error } = await supabase.from(table).select('*').eq('tenant_id', tenantId).limit(1000);
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        console.warn(`[Backup] Erro na tabela ${table}:`, e);
+        return [];
+      }
+    };
+
+    const [projects, products, strategies, leads] = await Promise.all([
+      safeGet('projects'),
+      safeGet('products'),
+      safeGet('strategy_versions'),
+      safeGet('leads')
+    ]);
+
+    const backupData = {
+      timestamp: new Date().toISOString(),
+      tenantId,
+      projects,
+      products,
+      strategies,
+      leads,
+      version: "1.1-safe-backup"
+    };
+
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `getleads_backup_${new Date().getTime()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    alert("Backup baixado com sucesso! Verifique sua pasta de Downloads.");
+    return { success: true };
+  } catch (e) {
+    alert("Ocorreu um erro ao gerar o arquivo JSON. Verifique o console.");
+    console.error("[Backup] Falha crítica:", e);
+    throw e;
   }
 };

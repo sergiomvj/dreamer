@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { getGlobalInsights } from '../services/geminiService';
+import { getGlobalInsights, downloadProjectBackup } from '../services/geminiService';
 
 const Dashboard: React.FC<{ tenantId?: string | null, setActiveTab?: (tab: string) => void }> = ({ tenantId, setActiveTab }) => {
   const [loading, setLoading] = useState(false);
@@ -73,6 +73,15 @@ const Dashboard: React.FC<{ tenantId?: string | null, setActiveTab?: (tab: strin
           <p className="text-slate-500 mt-1">Interpretação sistêmica da sua governança de aquisição.</p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => tenantId && downloadProjectBackup(tenantId)}
+            className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg flex items-center gap-2 transition-all active:scale-95 group"
+            title="Baixar Backup de Segurança (JSON)"
+          >
+            <span className="material-symbols-outlined text-sm text-emerald-400 group-hover:rotate-12 transition-transform">shield</span>
+            <span className="text-xs font-bold">Safe Backup</span>
+          </button>
+
           <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-lg flex items-center gap-2">
             <span className="material-symbols-outlined text-sm text-primary">calendar_today</span>
             <span className="text-xs font-bold">Últimas 24h</span>

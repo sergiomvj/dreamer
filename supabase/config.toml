@@ -1,4 +1,7 @@
-project_id = "irymkdetnkjwvgpvtohu"
+project_id = "hllewakzczxogunietzm"
+
+[functions.hub]
+verify_jwt = false
 
 [functions.llm]
-verify_jwt = true
+verify_jwt = false

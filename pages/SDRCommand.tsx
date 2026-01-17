@@ -10,7 +10,7 @@ interface Message {
   nextStep?: string;
 }
 
-const SDRCommand: React.FC = () => {
+const SDRCommand: React.FC<{ tenantId?: string | null }> = () => {
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: 'model', 
@@ -216,7 +216,7 @@ const SDRCommand: React.FC = () => {
               </button>
             </div>
             <p className="text-[10px] text-slate-600 mt-3 text-center font-medium uppercase tracking-[0.2em]">
-              Interaction processed via Gemini 3 Cognitive Intelligence
+              Interaction processed via OpenRouter LLM
             </p>
           </div>
         </div>

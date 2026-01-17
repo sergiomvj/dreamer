@@ -21,7 +21,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
       label: 'Arquitetura',
       items: [
         { id: 'products', label: 'Produtos & Ofertas', icon: 'shopping_bag' },
+        { id: 'campaigns', label: 'Campanhas', icon: 'campaign' },
+        { id: 'datamining', label: 'Data Mining', icon: 'engineering' },
+        { id: 'content-ideation', label: 'Ideias de Conteúdo', icon: 'emoji_objects' },
+        { id: 'paid-traffic', label: 'Tráfego Pago', icon: 'paid' },
         { id: 'orchestration', label: 'Orquestração (Fluxos)', icon: 'account_tree' },
+        { id: 'whatsapp', label: 'WhatsApp', icon: 'chat' },
+        { id: 'social-media', label: 'Social Media', icon: 'share' },
       ]
     },
     {
@@ -37,6 +43,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
       items: [
         { id: 'insights', label: 'Insights & BI', icon: 'bar_chart' },
         { id: 'playbooks', label: 'Playbook Library', icon: 'library_books' },
+      ]
+    },
+    {
+      label: 'Receita',
+      items: [
+        { id: 'monetization', label: 'Monetização', icon: 'payments' },
+      ]
+    },
+    {
+      label: 'Sistema',
+      items: [
+        { id: 'settings', label: 'Configurações', icon: 'settings' },
       ]
     }
   ];
@@ -56,7 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">The Lead Machine</span>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => setIsOpen(false)}
           className="lg:hidden p-1 text-slate-500 hover:text-white"
         >
@@ -72,11 +90,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                  activeTab === item.id 
-                    ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${activeTab === item.id
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
               >
                 <span className={`material-symbols-outlined text-[20px] ${activeTab === item.id ? 'text-white' : 'text-slate-500 group-hover:text-primary'}`}>
                   {item.icon}
@@ -88,7 +105,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
         ))}
       </nav>
 
-      <div className="p-4 border-t border-border-dark bg-surface-dark/30">
+      <div className="p-4 border-t border-border-dark bg-surface-dark/30 space-y-3">
+        <button
+          onClick={() => window.open('/docs/operation-manual.html', '_blank')}
+          className="w-full flex items-center justify-between bg-primary/10 hover:bg-primary/20 border border-primary/20 p-3 rounded-xl group transition-all"
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-[20px]">menu_book</span>
+            <span className="text-xs font-bold text-white tracking-tight">Manual de Operação</span>
+          </div>
+          <span className="material-symbols-outlined text-slate-500 text-sm group-hover:text-primary transition-all">open_in_new</span>
+        </button>
+
         <div className="bg-white/5 p-4 rounded-xl border border-white/5">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Cognitive Core</p>
           <div className="flex items-center gap-2">

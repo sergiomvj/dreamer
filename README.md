@@ -1,20 +1,86 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Acquisition Intelligence Platform (GetLeads)
 
-# Run and deploy your AI Studio app
+Uma plataforma completa de aquisição e inteligência de leads, integrando Marketing de Conteúdo, Tráfego Pago, CRM, Automação e Redes Sociais.
 
-This contains everything you need to run your app locally.
+## 🚀 Módulos
 
-View your app in AI Studio: https://ai.studio/apps/drive/1ALhfp4cVMe2Lo8DzdqHdwnosNRkw854D
+### 1. Inbound (Conteúdo & SEO)
+*   **Geração de Ideias**: Uso de IA (Gemini) para gerar ideias de conteúdo baseadas em campanhas.
+*   **Editor de Rascunhos**: Editor de texto rico para expandir ideias em posts/artigos.
+*   **Gestão de Status**: Fluxo de Ideia -> Rascunho -> Publicado.
 
-## Run Locally
+### 2. Outbound (Tráfego Pago)
+*   **Gestão de Contas**: Conexão com Meta Ads (Facebook/Instagram).
+*   **Dashboard de Performance**: Visualização de métricas (Spend, CPA, CTR).
+*   **Regras de Otimização**: Configuração de regras automáticas (ex: Pausar se CPA > X).
 
-**Prerequisites:**  Node.js
+### 3. CRM Estratégico
+*   **Gestão de Leads**: Visualização em Lista e Kanban.
+*   **Perfil 360º**: Detalhes do lead, timeline de eventos e tarefas.
+*   **Scoring**: Pontuação automática de leads.
 
+### 4. Automação
+*   **Data Mining**: Ferramenta de scraping para extrair contatos de fontes externas (LinkedIn, Google).
+*   **Email Marketing**: Construtor visual de sequências de email e disparos automáticos.
+*   **WhatsApp**: Interface de chat integrada para atendimento e disparos.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 5. Redes Sociais
+*   **Calendário**: Visualização mensal de postagens.
+*   **Agendamento**: Criação de posts para LinkedIn/Instagram.
+*   **Integração**: Importação direta de conteúdos "Publicados" do módulo Inbound.
+
+## 🛠️ Tecnologia
+
+*   **Frontend**: React, TypeScript, TailwindCSS, Vite.
+*   **Backend**: Supabase (PostgreSQL, Auth, Realtime).
+*   **Edge Functions**: Deno (Supabase Functions) para lógica de IA e Automação.
+*   **IA**: Integração com Google Gemini.
+
+## 📦 Instalação
+
+1.  **Clone o repositório**:
+    ```bash
+    git clone <repo-url>
+    cd GetLeads
+    ```
+
+2.  **Instale as dependências**:
+    ```bash
+    npm install
+    ```
+
+3.  **Configuração do Supabase**:
+    *   Crie um projeto no Supabase.
+    *   Execute os scripts SQL na pasta `supabase/` na ordem correta (ou use o `schema.sql` consolidado).
+    *   Configure as variáveis de ambiente em `.env.local`:
+        ```
+        VITE_SUPABASE_URL=your_project_url
+        VITE_SUPABASE_ANON_KEY=your_anon_key
+        ```
+
+4.  **Execute o projeto**:
+    ```bash
+    npm run dev
+    ```
+
+## 🔄 Edge Functions (Workers)
+
+Para funcionalidades de automação (Scraping, Email, AI), é necessário deployar as Edge Functions:
+
+```bash
+supabase functions deploy llm
+supabase functions deploy scraping-worker
+supabase functions deploy sequence-worker
+```
+
+## 📅 Status do Projeto
+
+*   [x] Fase 0: Foundation
+*   [x] Fase 1: Content
+*   [x] Fase 2: Paid Traffic
+*   [x] Fase 3: CRM
+*   [x] Fase 4: Automation
+*   [x] Fase 5: Social Media
+
+---
+Desenvolvido com ❤️ e IA.

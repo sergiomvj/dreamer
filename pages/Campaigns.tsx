@@ -12,6 +12,7 @@ type Campaign = {
   description: string | null;
   status: string | null;
   strategies: Strategy[];
+  channels: Channel[];
 };
 
 type Strategy = {
@@ -25,15 +26,23 @@ type Channel = {
 };
 
 const Campaigns: React.FC<{ tenantId?: string | null }> = ({ tenantId }) => {
-  const [projects, setProjects] = useState<Project[]>([]);
+  // Selections
+  const [clients, setClients] = useState<any[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [products, setProducts] = useState<any[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(false);
+  const [scopeLoading, setScopeLoading] = useState(false);
+  const [projectScope, setProjectScope] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // State for the new campaign form
+  // Form State
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newCampaignDescription, setNewCampaignDescription] = useState('');
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([]);
@@ -41,40 +50,99 @@ const Campaigns: React.FC<{ tenantId?: string | null }> = ({ tenantId }) => {
 
   useEffect(() => {
     if (tenantId) {
-      loadProjects();
+      loadClients();
       loadChannels();
     }
   }, [tenantId]);
 
   useEffect(() => {
-    if (selectedProjectId) {
-      loadCampaigns(selectedProjectId);
-      loadStrategies(selectedProjectId);
+    if (selectedClientId) {
+      loadProjects(selectedClientId);
     } else {
+      setProjects([]);
+      setSelectedProjectId('');
+    }
+  }, [selectedClientId]);
+
+  useEffect(() => {
+    if (selectedProjectId) {
+      loadProducts(selectedProjectId);
+      loadCampaigns(selectedProjectId);
+    } else {
+      setProducts([]);
+      setSelectedProductId('');
       setCampaigns([]);
-      setStrategies([]);
     }
   }, [selectedProjectId]);
 
-  const loadProjects = async () => {
+  useEffect(() => {
+    if (selectedProductId) {
+      generateProjectScope(selectedProductId);
+    } else {
+      setProjectScope(null);
+    }
+  }, [selectedProductId]);
+
+  const loadClients = async () => {
     if (!tenantId) return;
     setLoading(true);
     try {
       const { data, error: loadError } = await supabase
         .from('projects')
-        .select('id,name')
+        .select('id, name')
         .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: false });
+        .order('name');
       if (loadError) throw loadError;
-      setProjects((data || []) as Project[]);
-      if (data && data.length > 0) {
-        setSelectedProjectId(data[0].id);
-      }
+      setClients(data || []);
+      if (data && data.length > 0) setSelectedClientId(data[0].id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao carregar projetos.');
+      setError('Erro ao carregar clientes.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadProjects = async (cId: string) => {
+    try {
+      const { data } = await supabase.from('client_projects').select('id, name').eq('client_id', cId).order('name');
+      setProjects(data || []);
+      if (data && data.length > 0) setSelectedProjectId(data[0].id);
+      else setSelectedProjectId('');
+    } catch (e) { console.error(e); }
+  };
+
+  const loadProducts = async (pId: string) => {
+    try {
+      // FILTRO: Apenas ofertas validadas (approved ou force_approved)
+      // Nota: O mockup do banco ainda pode estar sendo atualizado, então simulamos o filtro logicamente se necessário
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .eq('client_project_id', pId)
+        .in('validation_status', ['approved', 'force_approved'])
+        .order('name');
+
+      setProducts(data || []);
+      if (data && data.length > 0) setSelectedProductId(data[0].id);
+      else setSelectedProductId('');
+    } catch (e) { console.error(e); }
+  };
+
+  const generateProjectScope = async (prodId: string) => {
+    setScopeLoading(true);
+    // Simulação de IA gerando o escopo com base no relatório do Lion
+    setTimeout(() => {
+      setProjectScope({
+        title: "Escopo de Execução Prioritário",
+        deliverables: [
+          "Configuração de Pixel de Conversão na LP",
+          "Ativação de Fluxo de Abandono (n8n)",
+          "Launch de Criativos Focados em 'Dor de Incompetência'"
+        ],
+        lionInsight: "Este projeto exige vigilância sobre o CPC. O escopo foca em volume inicial para treinar o algoritmo."
+      });
+      setScopeLoading(false);
+    }, 1500);
   };
 
   const loadChannels = async () => {
@@ -106,7 +174,7 @@ const Campaigns: React.FC<{ tenantId?: string | null }> = ({ tenantId }) => {
     }
   };
 
-  const loadCampaigns = async (projectId: string) => {
+  const loadCampaigns = async (pId: string) => {
     if (!tenantId) return;
     setLoading(true);
     try {
@@ -121,12 +189,12 @@ const Campaigns: React.FC<{ tenantId?: string | null }> = ({ tenantId }) => {
           channels (id, name)
         `)
         .eq('tenant_id', tenantId)
-        .eq('project_id', projectId)
+        .eq('client_project_id', pId) // Usando a nova coluna de hierarquia
         .order('created_at', { ascending: false });
       if (loadError) throw loadError;
       setCampaigns((data || []) as Campaign[]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao carregar campanhas.');
+      setError('Erro ao carregar campanhas do projeto.');
     } finally {
       setLoading(false);
     }
@@ -142,9 +210,12 @@ const Campaigns: React.FC<{ tenantId?: string | null }> = ({ tenantId }) => {
         .from('campaigns')
         .insert({
           tenant_id: tenantId,
-          project_id: selectedProjectId,
+          project_id: selectedClientId, // Mantém compatibilidade com legacy se necessário
+          client_project_id: selectedProjectId, // Nova Hierarquia
+          product_id: selectedProductId, // Oferta Validada
           name: newCampaignName,
           description: newCampaignDescription,
+          status: 'draft'
         })
         .select('id')
         .single();
@@ -218,21 +289,92 @@ const Campaigns: React.FC<{ tenantId?: string | null }> = ({ tenantId }) => {
         </div>
       </header>
       <div className="mt-8 space-y-8">
-        {/* Project Selector */}
-        <div className="max-w-md">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Projeto Ativo</label>
-          <select
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="w-full bg-surface-dark border border-border-dark rounded-xl px-4 py-3 text-slate-200 focus:ring-primary focus:border-primary"
-            disabled={loading || projects.length === 0}
-          >
-            {projects.length === 0 && <option>Nenhum projeto encontrado</option>}
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+        {/* Hierarchical Selector */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Cliente</label>
+            <select
+              value={selectedClientId}
+              onChange={(e) => setSelectedClientId(e.target.value)}
+              className="w-full bg-surface-dark border border-white/5 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-primary transition-all appearance-none"
+            >
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Projeto</label>
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="w-full bg-surface-dark border border-white/5 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-primary transition-all appearance-none disabled:opacity-50"
+              disabled={!selectedClientId || projects.length === 0}
+            >
+              {projects.length === 0 && <option value="">Sem projetos ativos</option>}
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Oferta Validada (Lion)</label>
+            <select
+              value={selectedProductId}
+              onChange={(e) => setSelectedProductId(e.target.value)}
+              className="w-full bg-surface-dark border border-white/5 rounded-2xl px-5 py-4 text-primary font-black outline-none focus:border-primary transition-all appearance-none disabled:opacity-50"
+              disabled={!selectedProjectId || products.length === 0}
+            >
+              {products.length === 0 && <option value="">Aguardando validação IA...</option>}
+              {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
         </div>
+
+        {/* Project Scope View (NEW) */}
+        {selectedProductId && (
+          <div className="bg-primary/5 border border-primary/20 rounded-[32px] p-8 space-y-6 animate-in slide-in-from-top-4 duration-500 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-5">
+              <span className="material-symbols-outlined text-[100px] text-primary">token</span>
+            </div>
+            {scopeLoading ? (
+              <div className="flex items-center gap-4 animate-pulse">
+                <div className="size-10 bg-primary/20 rounded-full animate-spin"></div>
+                <p className="text-sm font-black text-primary uppercase tracking-widest">IA interpretando escopo operacional...</p>
+              </div>
+            ) : projectScope && (
+              <>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-black text-white italic tracking-tight">{projectScope.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="size-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vinculado à Oferta: {products.find(p => p.id === selectedProductId)?.name}</p>
+                    </div>
+                  </div>
+                  <button className="bg-primary text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+                    Ativar Automações
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Deliverables de Campanha:</p>
+                    <ul className="space-y-2">
+                      {projectScope.deliverables.map((d: string, i: number) => (
+                        <li key={i} className="flex items-center gap-3 text-sm text-slate-200 font-medium">
+                          <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
+                          {d}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="bg-black/20 p-6 rounded-3xl border border-white/5 space-y-2 self-start">
+                    <p className="text-[10px] font-black text-primary uppercase tracking-widest">Lion Intel:</p>
+                    <p className="text-xs text-slate-400 font-medium italic leading-relaxed">"{projectScope.lionInsight}"</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className={`transition-opacity duration-500 ${selectedProjectId ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -348,27 +490,27 @@ const Campaigns: React.FC<{ tenantId?: string | null }> = ({ tenantId }) => {
                     <div className="border-t border-border-dark pt-3">
                       <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Estratégias</h4>
                       <div className="flex flex-wrap gap-2">
-                          {c.strategies && c.strategies.map(s => (
-                              <div key={s.id} className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1">
-                                  {s.name}
-                              </div>
-                          ))}
-                          {(!c.strategies || c.strategies.length === 0) && (
-                              <p className="text-xs text-slate-500">Nenhuma.</p>
-                          )}
+                        {c.strategies && c.strategies.map(s => (
+                          <div key={s.id} className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1">
+                            {s.name}
+                          </div>
+                        ))}
+                        {(!c.strategies || c.strategies.length === 0) && (
+                          <p className="text-xs text-slate-500">Nenhuma.</p>
+                        )}
                       </div>
                     </div>
                     <div className="border-t border-border-dark pt-3">
                       <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Canais</h4>
                       <div className="flex flex-wrap gap-2">
-                          {c.channels && c.channels.map(ch => (
-                              <div key={ch.id} className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1">
-                                  {ch.name}
-                              </div>
-                          ))}
-                          {(!c.channels || c.channels.length === 0) && (
-                              <p className="text-xs text-slate-500">Nenhum.</p>
-                          )}
+                        {c.channels && c.channels.map(ch => (
+                          <div key={ch.id} className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1">
+                            {ch.name}
+                          </div>
+                        ))}
+                        {(!c.channels || c.channels.length === 0) && (
+                          <p className="text-xs text-slate-500">Nenhum.</p>
+                        )}
                       </div>
                     </div>
                   </div>

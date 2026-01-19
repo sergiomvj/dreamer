@@ -14,13 +14,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
       label: 'Governança',
       items: [
         { id: 'dashboard', label: 'Control Tower', icon: 'dashboard' },
-        { id: 'strategy', label: 'Projetos & Onboarding', icon: 'explore' },
+        { id: 'planning', label: 'Gestão Estratégica', icon: 'architecture' },
+        { id: 'strategy', label: 'Clientes', icon: 'explore' },
       ]
     },
     {
-      label: 'Arquitetura',
+      label: 'Execução',
       items: [
-        { id: 'products', label: 'Produtos & Ofertas', icon: 'shopping_bag' },
+        { id: 'products', label: 'Projetos & Produtos', icon: 'inventory' },
         { id: 'campaigns', label: 'Campanhas', icon: 'campaign' },
         { id: 'datamining', label: 'Data Mining', icon: 'engineering' },
         { id: 'content-ideation', label: 'Ideias de Conteúdo', icon: 'emoji_objects' },

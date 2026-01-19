@@ -14,6 +14,7 @@ const MONETIZATION_CATEGORIES = [
         icon: 'grid_view',
         color: 'text-emerald-500',
         items: [
+            { id: 'adsense', name: 'Google AdSense', desc: 'O padrão da indústria. Ideal para qualquer volume inicial.', url: 'https://www.google.com/adsense', req: 'Conteúdo original e conformidade com políticas.' },
             { id: 'ezoic', name: 'Ezoic', desc: 'Ideal para blogs médios (10k+ visitas). IA otimiza layout.', url: 'https://www.ezoic.com', req: 'Conteúdo original, conformidade com AdSense.' },
             { id: 'mediavine', name: 'Mediavine', desc: 'Ideal para blogs grandes (50k+ sessões). Excelente RPM.', url: 'https://www.mediavine.com', req: '50k sessões/mês, conteúdo lifestyle/food/travel.' },
             { id: 'adthrive', name: 'AdThrive (Raptive)', desc: 'Blogs premium (100k+ pageviews). Altíssima monetização.', url: 'https://raptive.com', req: '100k pageviews/mês, tráfego US/CA/UK.' },

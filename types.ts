@@ -119,7 +119,7 @@ export interface ScrapingTarget {
   tenant_id: string;
   name: string;
   url: string;
-  platform: 'linkedin' | 'google' | 'instagram' | 'other';
+  platform: 'linkedin' | 'google' | 'instagram' | 'amazon' | 'other';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   last_run_at?: string;
   config?: any;

@@ -22,6 +22,9 @@ import Monetization from './pages/Monetization.tsx';
 import Products from './pages/Products.tsx';
 import Settings from './pages/Settings.tsx';
 import Playbooks from './pages/Playbooks';
+import StrategicPlanning from './pages/StrategicPlanning';
+import ExecutionMotor from './pages/ExecutionMotor';
+import AutomationHub from './pages/AutomationHub';
 import { supabase } from './services/supabaseClient';
 
 const App: React.FC = () => {
@@ -99,13 +102,14 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard tenantId={activeTenantId} setActiveTab={setActiveTab} />;
+      case 'planning': return <StrategicPlanning tenantId={activeTenantId} />;
       case 'strategy': return <StrategySetup tenantId={activeTenantId} />;
       case 'campaigns': return <Campaigns />;
       case 'content-ideation': return <ContentIdeation tenantId={activeTenantId} />;
       case 'paid-traffic': return <PaidTraffic tenantId={activeTenantId} />;
-      case 'orchestration': return <Orchestration tenantId={activeTenantId} />;
+      case 'orchestration': return <AutomationHub tenantId={activeTenantId} />;
       case 'datamining': return <DataMining tenantId={activeTenantId} />;
-      case 'whatsapp': return <WhatsApp tenantId={activeTenantId} />;
+      case 'whatsapp': return <ExecutionMotor tenantId={activeTenantId} />;
       case 'social-media': return <SocialMedia tenantId={activeTenantId} />;
       case 'leads': return <LeadsCRM tenantId={activeTenantId} />;
       case 'decisions': return <DecisionEngine tenantId={activeTenantId} />;
@@ -116,34 +120,7 @@ const App: React.FC = () => {
       case 'settings': return <Settings tenantId={activeTenantId} />;
       case 'playbooks':
         return <Playbooks tenantId={activeTenantId} />;
-        return (
-          <div className="p-8 max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black">Configurações do Sistema</h2>
-            <div className="bg-card-dark border border-border-dark p-8 rounded-2xl space-y-8">
-              <div>
-                <label className="block text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest">Nível de Autonomia da IA</label>
-                <input type="range" className="w-full accent-primary h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
-                <div className="flex justify-between text-[10px] font-black text-slate-500 mt-4 tracking-widest">
-                  <span>ASSISTIDA</span>
-                  <span>CO-PILOTO</span>
-                  <span>AUTÔNOMA</span>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold">Auto-Handoff</span>
-                    <span className="text-[10px] text-slate-500 text-left">Escalar automaticamente para SDR humano em casos de urgência.</span>
-                  </div>
-                  <div className="size-6 bg-primary rounded shadow-lg shadow-primary/20 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-white text-sm">check</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      default: return <Dashboard />;
+      default: return <Dashboard tenantId={activeTenantId} setActiveTab={setActiveTab} />;
     }
   };
 

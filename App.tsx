@@ -35,14 +35,14 @@ const App: React.FC = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [activeTenantId, setActiveTenantId] = useState<string | null>(() => {
     try {
-      return localStorage.getItem("dreamer.tenant_id");
+      return localStorage.getItem("planner.tenant_id");
     } catch {
       return null;
     }
   });
   const [activeTenantName, setActiveTenantName] = useState<string | null>(() => {
     try {
-      return localStorage.getItem("dreamer.tenant_name");
+      return localStorage.getItem("planner.tenant_name");
     } catch {
       return null;
     }
@@ -67,8 +67,8 @@ const App: React.FC = () => {
         setActiveTenantId(null);
         setActiveTenantName(null);
         try {
-          localStorage.removeItem("dreamer.tenant_id");
-          localStorage.removeItem("dreamer.tenant_name");
+          localStorage.removeItem("planner.tenant_id");
+          localStorage.removeItem("planner.tenant_name");
         } catch { }
       }
     });
@@ -81,8 +81,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     try {
-      if (activeTenantId) localStorage.setItem("dreamer.tenant_id", activeTenantId);
-      if (activeTenantName) localStorage.setItem("dreamer.tenant_name", activeTenantName);
+      if (activeTenantId) localStorage.setItem("planner.tenant_id", activeTenantId);
+      if (activeTenantName) localStorage.setItem("planner.tenant_name", activeTenantName);
     } catch { }
   }, [activeTenantId, activeTenantName]);
 
@@ -181,10 +181,10 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <div className="flex lg:hidden items-center gap-2">
               <div className="bg-primary size-7 rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
-                <span className="material-symbols-outlined text-lg">polyline</span>
+                <span className="material-symbols-outlined text-lg">architecture</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-black tracking-tight leading-none">Dreamer</span>
+                <span className="text-sm font-black tracking-tight leading-none">Planner</span>
                 <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">The Lead Machine</span>
               </div>
             </div>

@@ -68,10 +68,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
       <div className="p-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="bg-primary size-8 rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
-            <span className="material-symbols-outlined text-xl">polyline</span>
+            <span className="material-symbols-outlined text-xl">architecture</span>
           </div>
           <div className="flex flex-col">
-            <h1 className="text-xl font-black tracking-tight leading-none">Dreamer</h1>
+            <h1 className="text-xl font-black tracking-tight leading-none">Planner</h1>
             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">The Lead Machine</span>
           </div>
         </div>

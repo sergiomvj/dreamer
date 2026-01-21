@@ -34,10 +34,10 @@ const Auth: React.FC = () => {
       <div className="w-full max-w-md bg-card-dark border border-border-dark rounded-2xl p-8 space-y-8">
         <div className="flex items-center gap-3">
           <div className="bg-primary size-10 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
-            <span className="material-symbols-outlined text-xl">polyline</span>
+            <span className="material-symbols-outlined text-xl">architecture</span>
           </div>
           <div className="flex flex-col">
-            <h1 className="text-2xl font-black tracking-tight leading-none">Dreamer</h1>
+            <h1 className="text-2xl font-black tracking-tight leading-none">Planner</h1>
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Lead Operations OS</span>
           </div>
         </div>

@@ -115,9 +115,8 @@ const Workspace: React.FC<{
                   <button
                     key={t.id}
                     onClick={() => onSelectTenant(t)}
-                    className={`w-full text-left p-5 hover:bg-white/5 transition-colors flex items-center justify-between ${
-                      activeTenant?.id === t.id ? "bg-primary/10" : ""
-                    }`}
+                    className={`w-full text-left p-5 hover:bg-white/5 transition-colors flex items-center justify-between ${activeTenant?.id === t.id ? "bg-primary/10" : ""
+                      }`}
                   >
                     <div className="space-y-1">
                       <p className="font-bold">{t.name}</p>
@@ -139,7 +138,7 @@ const Workspace: React.FC<{
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="w-full bg-surface-dark border border-border-dark rounded-xl px-4 py-3 text-slate-200 focus:ring-primary focus:border-primary"
-                  placeholder="Ex: Dreamer Corp"
+                  placeholder="Ex: Planner Corp"
                 />
               </div>
               <button

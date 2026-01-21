@@ -49,7 +49,7 @@ export type LLM_StrategyProps = {
   title?: string;
 };
 
-const LLM_Strategy: React.FC<LLM_StrategyProps> = ({ storageKeyPrefix = "dreamer.llm", title = "LLM Pools" }) => {
+const LLM_Strategy: React.FC<LLM_StrategyProps> = ({ storageKeyPrefix = "planner.llm", title = "LLM Pools" }) => {
   const poolKey = `${storageKeyPrefix}.pool`;
   const overrideModelKey = `${storageKeyPrefix}.model`;
 
@@ -101,7 +101,7 @@ const LLM_Strategy: React.FC<LLM_StrategyProps> = ({ storageKeyPrefix = "dreamer
 
       const savedOverride = localStorage.getItem(overrideModelKey);
       setOverrideModel(savedOverride?.trim() || "");
-    } catch {}
+    } catch { }
   }, [overrideModelKey, poolKey]);
 
   useEffect(() => {
@@ -123,13 +123,13 @@ const LLM_Strategy: React.FC<LLM_StrategyProps> = ({ storageKeyPrefix = "dreamer
 
     try {
       localStorage.setItem(poolKey, JSON.stringify(config));
-    } catch {}
+    } catch { }
   }, [defaultUrgency, freeEnabled, freeModels, paidEnabled, paidModels, poolKey, purposeTier]);
 
   useEffect(() => {
     try {
       localStorage.setItem(overrideModelKey, overrideModel);
-    } catch {}
+    } catch { }
   }, [overrideModel, overrideModelKey]);
 
   return (
